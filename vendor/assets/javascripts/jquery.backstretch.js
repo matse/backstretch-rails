@@ -1,3 +1,83 @@
+(function() {
+    var FX = {
+        easing: {
+            linear: function(progress) {
+                return progress;
+            },
+            quadratic: function(progress) {
+                return Math.pow(progress, 2);
+            },
+            swing: function(progress) {
+                return 0.5 - Math.cos(progress * Math.PI) / 2;
+            },
+            circ: function(progress) {
+                return 1 - Math.sin(Math.acos(progress));
+            },
+            back: function(progress, x) {
+                return Math.pow(progress, 2) * ((x + 1) * progress - x);
+            },
+            bounce: function(progress) {
+                for (var a = 0, b = 1, result; 1; a += b, b /= 2) {
+                    if (progress >= (7 - 4 * a) / 11) {
+                        return -Math.pow((11 - 6 * a - 11 * progress) / 4, 2) + Math.pow(b, 2);
+                    }
+                }
+            },
+            elastic: function(progress, x) {
+                return Math.pow(2, 10 * (progress - 1)) * Math.cos(20 * Math.PI * x / 3 * progress);
+            }
+        },
+        animate: function(options) {
+            var start = new Date;
+            var id = setInterval(function() {
+                var timePassed = new Date - start;
+                var progress = timePassed / options.duration;
+                if (progress > 1) {
+                    progress = 1;
+                }
+                options.progress = progress;
+                var delta = options.delta(progress);
+                options.step(delta);
+                if (progress == 1) {
+                    clearInterval(id);
+                    options.complete();
+                }
+            }, options.delay || 10);
+        },
+        fadeOut: function(element, options) {
+            var to = 1;
+            this.animate({
+                duration: options.duration,
+                delta: function(progress) {
+                    progress = this.progress;
+                    return FX.easing.swing(progress);
+                },
+                complete: options.complete,
+                step: function(delta) {
+                    element.style.opacity = to - delta;
+                }
+            });
+        },
+        fadeIn: function(element, options) {
+            var to = 0;
+            element.style.opacity = 0;
+            element.style.display = 'block';
+            this.animate({
+                duration: options.duration,
+                delta: function(progress) {
+                    progress = this.progress;
+                    return FX.easing.swing(progress);
+                },
+                delay: 100,
+                complete: options.complete,
+                step: function(delta) {
+                    element.style.opacity = to + delta;
+                }
+            });
+        }
+    };
+    window.FX = FX;
+})()
 /*! Backstretch - v2.0.4 - 2013-06-19
 * http://srobbin.com/jquery-plugins/backstretch/
 * Copyright (c) 2013 Scott Robbin; Licensed MIT */
@@ -74,7 +154,7 @@
   };
 
   /* STYLES
-   * 
+   *
    * Baked-in styles that we'll apply to our elements.
    * In an effort to keep the plugin simple, these are not exposed as options.
    * That said, anyone can override these in their own stylesheet.
@@ -118,7 +198,7 @@
     // Preload images
     $.each(this.images, function () {
       $('<img />')[0].src = this;
-    });    
+    });
 
     // Convenience reference to know if the container is body.
     this.isBody = container === document.body;
@@ -148,7 +228,7 @@
         , zIndex: zIndex === 'auto' ? 0 : zIndex
         , background: 'none'
       });
-      
+
       // Needs a higher z-index
       this.$wrap.css({zIndex: -999998});
     }
@@ -224,7 +304,7 @@
           , evtOptions = { relatedTarget: self.$container[0] };
 
         // Trigger the "before" event
-        self.$container.trigger($.Event('backstretch.before', evtOptions), [self, newIndex]); 
+        self.$container.trigger($.Event('backstretch.before', evtOptions), [self, newIndex]);
 
         // Set the new index
         this.index = newIndex;
@@ -238,26 +318,43 @@
                       .bind('load', function (e) {
                         var imgWidth = this.width || $(e.target).width()
                           , imgHeight = this.height || $(e.target).height();
-                        
+
                         // Save the ratio
                         $(this).data('ratio', imgWidth / imgHeight);
 
                         // Show the image, then delete the old one
                         // "speed" option has been deprecated, but we want backwards compatibilty
-                        $(this).fadeIn(self.options.speed || self.options.fade, function () {
-                          oldImage.remove();
+                        FX.fadeIn(this, {
+                          duration: self.options.speed || self.options.fade,
+                          complete: function () {
+                            oldImage.remove();
 
-                          // Resume the slideshow
-                          if (!self.paused) {
-                            self.cycle();
+                            // Resume the slideshow
+                            if (!self.paused) {
+                              self.cycle();
+                            }
+
+                            // Trigger the "after" and "show" events
+                            // "show" is being deprecated
+                            $(['after', 'show']).each(function () {
+                              self.$container.trigger($.Event('backstretch.' + this, evtOptions), [self, newIndex]);
+                            });
                           }
-
-                          // Trigger the "after" and "show" events
-                          // "show" is being deprecated
-                          $(['after', 'show']).each(function () {
-                            self.$container.trigger($.Event('backstretch.' + this, evtOptions), [self, newIndex]);
-                          });
                         });
+                        // $(this).fadeIn(self.options.speed || self.options.fade, function () {
+                        //   oldImage.remove();
+
+                        //   // Resume the slideshow
+                        //   if (!self.paused) {
+                        //     self.cycle();
+                        //   }
+
+                        //   // Trigger the "after" and "show" events
+                        //   // "show" is being deprecated
+                        //   $(['after', 'show']).each(function () {
+                        //     self.$container.trigger($.Event('backstretch.' + this, evtOptions), [self, newIndex]);
+                        //   });
+                        // });
 
                         // Resize
                         self.resize();
@@ -317,7 +414,7 @@
 
         // Remove Backstretch
         if(!preserveBackground) {
-          this.$wrap.remove();          
+          this.$wrap.remove();
         }
         this.$container.removeData('backstretch');
       }
@@ -352,23 +449,23 @@
     return !(
       // iOS 4.3 and older : Platform is iPhone/Pad/Touch and Webkit version is less than 534 (ios5)
       ((platform.indexOf( "iPhone" ) > -1 || platform.indexOf( "iPad" ) > -1  || platform.indexOf( "iPod" ) > -1 ) && wkversion && wkversion < 534) ||
-      
+
       // Opera Mini
       (window.operamini && ({}).toString.call( window.operamini ) === "[object OperaMini]") ||
       (operammobilematch && omversion < 7458) ||
-      
+
       //Android lte 2.1: Platform is Android and Webkit version is less than 533 (Android 2.2)
       (ua.indexOf( "Android" ) > -1 && wkversion && wkversion < 533) ||
-      
+
       // Firefox Mobile before 6.0 -
       (ffversion && ffversion < 6) ||
-      
+
       // WebOS less than 3
       ("palmGetResource" in window && wkversion && wkversion < 534) ||
-      
+
       // MeeGo
       (ua.indexOf( "MeeGo" ) > -1 && ua.indexOf( "NokiaBrowser/8.5.0" ) > -1) ||
-      
+
       // IE6
       (ieversion && ieversion <= 6)
     );
